@@ -27,8 +27,15 @@ connection = psycopg2.connect(url)
 @app.get("/")
 def index():
     return "Hello World"
-    
-@app.post("/api/room")
+
+
+# Api 1 Checkin: check if email is recorded 
+#  receive a string conatin email address
+#  check email address format
+#  filter sql
+#  check response
+#  send to front end
+@app.post("/api/checkin")
 def create_room():
     data = request.get_json()
     name = data["name"]
@@ -39,6 +46,11 @@ def create_room():
             room_id = cursor.fetchone()[0]
     return {"id":room_id,"message":f"Room {name} created."},201
 
+# Api 2 Checkin: return display
+#  receive a string conatin email address
+#  filter sql
+#  check response, withdraw data from response
+#  send to front end
 @app.post("/api/temperature")
 def add_temp():
     data = request.get_json()
@@ -52,8 +64,15 @@ def add_temp():
         with connection.cursor() as cursor:
             cursor.execute(CREATE_TEMPS_TABLE)
             cursor.execute(INSERT_TEMP, (room_id,temperature,date))
-    return {"message":"Temperature added"},201
+            Ename= cursor.fetchone()[0]
+            Lottery_id= cursor.fetchone()[1]
+    return {"Ename":Ename,"Lottery_id":Lottery_id },201
 
+
+# Api 3 Lottery: lottery status
+#  filter sql, return array
+#  process response, generate random number
+#  send to front end
 @app.get("/api/average")
 def get_global_avg():
     with connection:
@@ -64,3 +83,18 @@ def get_global_avg():
             days = cursor.fetchone()[0]
     return {"average": round(average,2),"days":days}
 
+
+# Api 4 Lottery: save winner
+#  receive a string lottery number
+#  insert sql, (response)
+#  check response, withdraw data from response
+@app.post("/api/average")
+def get_global_avg():
+    data = request.get_json()
+    with connection:
+        with connection.cursor() as cursor:
+            cursor.execute(GLOBAL_AVG)
+            average = cursor.fetchone()[0]
+            cursor.execute(GLOABAL_NUMBER_OF_DAYS)
+            days = cursor.fetchone()[0]
+    return {"average": round(average,2),"days":days}
