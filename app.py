@@ -3,6 +3,7 @@ import psycopg2
 from  datetime import datetime, timezone
 from dotenv import load_dotenv
 from flask import Flask,request
+import re
 
 CREATE_ROOM_TABLE = (
     "CREATE TABLE IF NOT EXISTS rooms (id SERIAL PRIMARY KEY, name TEXT);"
@@ -17,6 +18,10 @@ GLOABAL_NUMBER_OF_DAYS = (
     """SELECT COUNT(DISTINCT DATE(date)) AS days FROM temperatures;"""
 )
 GLOBAL_AVG = """SELECT ACG(temperature) As average FROM temperatures;"""
+
+# below are sql lines to complete
+
+GET_ENTRY_WITH_EMAIL = ("")
 
 load_dotenv()
 
@@ -35,24 +40,51 @@ def index():
 #  filter sql
 #  check response
 #  send to front end
-@app.post("/api/checkin")
+def is_valid_email(email):
+    pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+    return re.match(pattern, email) is not None
+
+@app.post("/api/check_email")
 def create_room():
     data = request.get_json()
-    name = data["name"]
+    email = data["email"]
+    if not is_valid_email(email):
+        return {"message": "Invalid email"}, 400
     with connection:
         with connection.cursor() as cursor:
-            cursor.execute(CREATE_ROOM_TABLE)
-            cursor.execute(INSERT_ROOM_RETURN_ID, (name,))
-            room_id = cursor.fetchone()[0]
-    return {"id":room_id,"message":f"Room {name} created."},201
+            cursor.execute(GET_ENTRY_WITH_EMAIL, (email,))
+            # cursor.execute(INSERT_ROOM_RETURN_ID, (name,))
+            record = cursor.fetchone()
+            if record is None:
+                return {"message": "Email not found."}, 404
+    # change index as appropriate
+    return {"email":record[0],"message":"Email found."},201
 
 # Api 2 Checkin: return display
 #  receive a string conatin email address
 #  filter sql
 #  check response, withdraw data from response
 #  send to front end
-@app.post("/api/temperature")
+@app.post("/api/check_lottery")
 def add_temp():
+    data = request.get_json()
+    email = data["email"]
+    if not is_valid_email(email):
+        return {"message": "Invalid email"}, 400
+    with connection:
+        with connection.cursor() as cursor:
+            cursor.execute(GET_ENTRY_WITH_EMAIL, (email,))
+            # cursor.execute(INSERT_ROOM_RETURN_ID, (name,))
+            record = cursor.fetchone()
+            if record is None:
+                return {"message": "Email not found."}, 404
+            if record[1] == None:
+                # lottery number not assigned
+                return {"email":record[0],"lottery": "None", "message":"Lottery number not assigned."},201
+    # change index as appropriate
+    return {"email":record[0], "lottery": record[1], "message":"Email found."},201
+
+    """
     data = request.get_json()
     temperature = data["temperature"]
     room_id = data["room"]
@@ -67,13 +99,14 @@ def add_temp():
             Ename= cursor.fetchone()[0]
             Lottery_id= cursor.fetchone()[1]
     return {"Ename":Ename,"Lottery_id":Lottery_id },201
+"""
 
 
 # Api 3 Lottery: lottery status
 #  filter sql, return array
 #  process response, generate random number
 #  send to front end
-@app.get("/api/average")
+@app.get("/api/lottery_status")
 def get_global_avg():
     with connection:
         with connection.cursor() as cursor:
@@ -89,7 +122,7 @@ def get_global_avg():
 #  insert sql, (response)
 #  check response, withdraw data from response
 @app.post("/api/average")
-def get_global_avg():
+def get_global_avg1():
     data = request.get_json()
     with connection:
         with connection.cursor() as cursor:
@@ -98,3 +131,16 @@ def get_global_avg():
             cursor.execute(GLOABAL_NUMBER_OF_DAYS)
             days = cursor.fetchone()[0]
     return {"average": round(average,2),"days":days}
+
+
+# function 1 checks if email is valid (in database)
+# function 2 return lottery number given valid email
+# 
+
+"""
+Idea:
+- at for each person with a lottery number but no checkin, remove lottery number; 
+keep list of removed lottery numbers
+- reassign lottery numbers sequentially following the last person previously
+assigned a lottery number
+"""
